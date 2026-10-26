@@ -1,0 +1,38 @@
+/*
+ * ov5640_dma 设备树片段 (PetaLinux 2020.2 / kernel 5.4, ZYNQ-7000 示例)
+ *
+ * 1. 把本节点放到 pl.dtsi 自动生成的设备树中, 或在 system-user.dtsi 中追加。
+ *    reg 基地址必须与 Vivado 中 AXI-Lite 从机的地址分配一致;
+ *    interrupts 号 = 61(PL IRQ 序号) - 16 = 45 (ZYNQ-7000 PL 中断 61~68 对应 SPI 45~52)。
+ *    ZynqMP (如 xczu4ev): PL 中断 121~128 对应 SPI 88~95, 如 interrupts = <0 88 4>。
+ * 2. sccb-adapter 指向 OV5640 SCCB 所挂的标准 I2C 控制器节点, 直接使用
+ *    内核标准 i2c 读写 (驱动内走 i2c_transfer), 不使用 i2c-gpio 位绑:
+ *      a) PS I2C 控制器 (cadence i2c) 经 EMIO 输出, 如 &i2c1, 引脚约束到摄像头 SCL/SDA;
+ *      b) PL 侧 AXI IIC IP (axi_iic), 如 &axi_iic。
+ */
+
+/ {
+	ov5640_dma_0: ov5640-dma@43c00000 {
+		compatible = "alinx,ov5640-dma-1.0";
+		reg = <0x43c00000 0x1000>;
+		interrupt-parent = <&intc>;
+		interrupts = <0 45 4>;		/* IRQ_F2P[0] */
+
+		sccb-adapter = <&i2c1>;		/* 标准 PS I2C 控制器 (经 EMIO), 或 &axi_iic */
+		sccb-addr = <0x3c>;		/* 7bit 地址, 对应 SCCB ID 0x78 */
+
+		width  = <1280>;		/* 输出分辨率 */
+		height = <720>;
+		total-hsize = <2570>;		/* 行总像素 (帧率) */
+		total-vsize = <980>;		/* 场总行数 (帧率) */
+		buffer-num = <3>;		/* DDR 缓存块数 1~3 */
+	};
+};
+
+/* PS I2C1 经 EMIO 输出到摄像头 SCCB (Vivado 中 I2C_1 勾选 EMIO):
+ * 若 system-top.dts 中 i2c1 已存在, 只需确认引脚约束, 无需重复定义。
+ */
+&i2c1 {
+	clock-frequency = <100000>;
+	status = "okay";
+};
